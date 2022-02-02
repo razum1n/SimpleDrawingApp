@@ -8,7 +8,6 @@ import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
-import android.media.Image
 import android.media.MediaScannerConnection
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
@@ -24,6 +23,7 @@ import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import top.defaults.colorpicker.ColorPickerPopup
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileOutputStream
@@ -34,6 +34,7 @@ class MainActivity : AppCompatActivity() {
     private var drawingView: DrawingView? = null
     private var mImageButtonCurrentPaint: ImageButton? = null
     var customProgressDialog: Dialog? = null
+    private var colorPicked: Int = 0
 
     val openGalleryLauncher: ActivityResultLauncher<Intent> =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
@@ -81,20 +82,17 @@ class MainActivity : AppCompatActivity() {
         drawingView = findViewById(R.id.drawing_view)
         drawingView?.setSizeForBrush(20.toFloat())
 
-        val linearLayoutPaintColors: LinearLayout = findViewById(R.id.ll_paint_colors)
-
-        mImageButtonCurrentPaint = linearLayoutPaintColors[1] as ImageButton
-        mImageButtonCurrentPaint!!.setImageDrawable(
-            ContextCompat.getDrawable(
-                this,
-                R.drawable.pallet_selected
-            )
-        )
-
         setupButtons()
     }
 
     private fun setupButtons() {
+
+        val ibPickColor: ImageButton = findViewById(R.id.ib_pick_color)
+        ibPickColor.setOnClickListener {
+            showColorPicker()
+        }
+
+
         val ibBrush: ImageButton = findViewById(R.id.ib_brush)
         ibBrush.setOnClickListener {
             showBrushSizeChooserDialog()
@@ -125,6 +123,18 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
+    }
+
+    private fun showColorPicker() {
+        ColorPickerPopup.Builder(this).initialColor(Color.RED).enableBrightness(true)
+            .enableAlpha(true).okTitle("Choose").cancelTitle("Cancel").showIndicator(true)
+            .showValue(true).build().show(object: ColorPickerPopup.ColorPickerObserver() {
+                override fun onColorPicked(color: Int) {
+                    colorPicked = color
+                    var hexColor = String.format("#%06X", colorPicked)
+                    drawingView?.setColor(hexColor)
+                }
+            })
     }
 
     private fun showBrushSizeChooserDialog() {
@@ -173,7 +183,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun isReadStorageAllowed(): Boolean {
-        val result = ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE)
+        val result =
+            ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE)
         return result == PackageManager.PERMISSION_GRANTED
     }
 
@@ -269,15 +280,14 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun cancelProgressDialog() {
-        if(customProgressDialog!=null) {
+        if (customProgressDialog != null) {
             customProgressDialog?.dismiss()
             customProgressDialog = null
         }
     }
 
     private fun shareImage(result: String) {
-        MediaScannerConnection.scanFile(this, arrayOf(result), null) {
-            path, uri ->
+        MediaScannerConnection.scanFile(this, arrayOf(result), null) { path, uri ->
             val shareIntent = Intent()
             shareIntent.action = Intent.ACTION_SEND
             shareIntent.putExtra(Intent.EXTRA_STREAM, uri)
